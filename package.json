@@ -1,9 +1,6 @@
 {
     "name": "decap-oauth",
     "private": true,
-    "type": "module",
-    "dependencies": {
-      "querystring": "^0.2.1"
-    }
+    "type": "module"
   }
   
