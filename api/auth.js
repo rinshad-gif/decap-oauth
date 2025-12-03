@@ -1,11 +1,12 @@
 import fetch from "node-fetch";
-import querystring from "querystring";
 
 export default async function handler(req, res) {
-  const params = querystring.parse(req.url.split("?")[1] || "");
 
-  // STEP 1: Redirect to GitHub login
-  if (!params.code) {
+  const url = new URL(req.url, `https://${req.headers.host}`);
+  const code = url.searchParams.get("code");
+
+  // STEP 1: Redirect to GitHub Auth
+  if (!code) {
     const redirect = `https://github.com/login/oauth/authorize?client_id=${process.env.GITHUB_CLIENT_ID}&scope=repo`;
     res.writeHead(302, { Location: redirect });
     return res.end();
@@ -21,14 +22,14 @@ export default async function handler(req, res) {
     body: JSON.stringify({
       client_id: process.env.GITHUB_CLIENT_ID,
       client_secret: process.env.GITHUB_CLIENT_SECRET,
-      code: params.code
+      code
     })
   });
 
   const data = await response.json();
 
-  // STEP 3: Send token back to Decap CMS
-  res.writeHead(200, { "Content-Type": "text/html" });
+  // STEP 3: Return token to Decap CMS
+  res.setHeader("Content-Type", "text/html");
   res.end(`
     <script>
       window.opener.postMessage(${JSON.stringify(data)}, "*");
