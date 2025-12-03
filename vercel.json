@@ -1,6 +1,6 @@
 {
     "functions": {
-      "api/*.js": {
+      "api/auth.js": {
         "runtime": "nodejs18.x"
       }
     }
