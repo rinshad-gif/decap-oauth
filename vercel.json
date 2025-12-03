@@ -1,6 +1,8 @@
 {
     "functions": {
-      "api/auth.js": { "runtime": "nodejs18.x" }
+      "api/auth.js": {
+        "runtime": "nodejs18.x@latest"
+      }
     }
   }
   
