@@ -28,12 +28,7 @@ export default async function handler(req, res) {
     const data = await response.json();
   
     // STEP 3: Send token back to Decap CMS
-    res.setHeader("Content-Type", "text/html");
-    res.send(`
-      <script>
-        window.opener.postMessage(${JSON.stringify(data)}, "*");
-        window.close();
-      </script>
-    `);
+    res.setHeader("Content-Type", "application/json");
+    res.send(data);
   }
   
