@@ -2,10 +2,13 @@ import fetch from "node-fetch";
 
 export default async function handler(req, res) {
   const { code } = req.query;
+  const CLIENT_ID = process.env.GITHUB_CLIENT_ID;
+  const CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET;
+  const REDIRECT_URI = "https://decap-oauth-21vi.vercel.app/api/auth";
 
   // STEP 1: Redirect user to GitHub
   if (!code) {
-    const authURL = `https://github.com/login/oauth/authorize?client_id=${process.env.GITHUB_CLIENT_ID}&scope=repo`;
+    const authURL = `https://github.com/login/oauth/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&scope=repo`;
     return res.redirect(authURL);
   }
 
@@ -17,9 +20,10 @@ export default async function handler(req, res) {
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
-      client_id: process.env.GITHUB_CLIENT_ID,
-      client_secret: process.env.GITHUB_CLIENT_SECRET,
-      code
+      client_id: CLIENT_ID,
+      client_secret: CLIENT_SECRET,
+      code: code,
+      redirect_uri: REDIRECT_URI
     })
   });
 
