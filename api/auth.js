@@ -1,25 +1,43 @@
-import fetch from "node-fetch";
+// Use CommonJS instead of ES modules for better compatibility
+const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 
-export default async function handler(req, res) {
+module.exports = async (req, res) => {
   try {
+    console.log('=== AUTH FUNCTION STARTED ===');
+    console.log('Method:', req.method);
+    console.log('Query:', req.query);
+    console.log('Headers:', req.headers);
+    
     const { code } = req.query;
     const CLIENT_ID = process.env.GITHUB_CLIENT_ID;
     const CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET;
-    const VERCEL_URL = process.env.VERCEL_URL || "https://decap-oauth-21vi.vercel.app";
-    const REDIRECT_URI = `${VERCEL_URL}/api/auth`;
-
-    // STEP 1: Redirect to GitHub OAuth
+    
+    if (!CLIENT_ID || !CLIENT_SECRET) {
+      console.error('Missing environment variables');
+      return res.status(500).json({ error: 'Server configuration error' });
+    }
+    
+    const REDIRECT_URI = `https://decap-oauth-21vi.vercel.app/api/auth`;
+    
+    // If no code, redirect to GitHub
     if (!code) {
-      const authURL = `https://github.com/login/oauth/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&scope=repo`;
+      const params = new URLSearchParams({
+        client_id: CLIENT_ID,
+        redirect_uri: REDIRECT_URI,
+        scope: 'repo'
+      });
+      const authURL = `https://github.com/login/oauth/authorize?${params}`;
+      console.log('Redirecting to:', authURL);
       return res.redirect(authURL);
     }
-
-    // STEP 2: Exchange code for token
-    const tokenRes = await fetch("https://github.com/login/oauth/access_token", {
-      method: "POST",
+    
+    // Exchange code for token
+    console.log('Exchanging code for token');
+    const tokenResponse = await fetch('https://github.com/login/oauth/access_token', {
+      method: 'POST',
       headers: {
-        "Accept": "application/json",
-        "Content-Type": "application/json"
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         client_id: CLIENT_ID,
@@ -28,27 +46,37 @@ export default async function handler(req, res) {
         redirect_uri: REDIRECT_URI
       })
     });
-
-    if (!tokenRes.ok) {
-      throw new Error(`GitHub API responded with ${tokenRes.status}`);
+    
+    const data = await tokenResponse.json();
+    console.log('GitHub response:', data);
+    
+    if (data.error) {
+      return res.status(400).json(data);
     }
-
-    const token = await tokenRes.json();
-
-    // STEP 3: Return token to Decap CMS
-    res.setHeader("Content-Type", "text/html");
-    res.end(`
+    
+    // Return to Decap CMS
+    res.setHeader('Content-Type', 'text/html');
+    const html = `
       <script>
-        window.opener.postMessage(${JSON.stringify(token)}, "*");
+        if (window.opener) {
+          window.opener.postMessage(${JSON.stringify(data)}, "*");
+        } else {
+          console.log('Token:', ${JSON.stringify(data)});
+        }
         window.close();
       </script>
-    `);
+      <p>Authentication complete. You can close this window.</p>
+    `;
+    res.end(html);
     
   } catch (error) {
-    console.error("Auth error:", error);
-    res.status(500).json({ 
-      error: "Internal Server Error", 
-      message: error.message 
+    console.error('FUNCTION CRASH:', error);
+    console.error('Error stack:', error.stack);
+    
+    res.status(500).json({
+      error: 'Function failed',
+      message: error.message,
+      stack: error.stack
     });
   }
-}
+};
