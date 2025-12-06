@@ -3,6 +3,7 @@ export default async function handler(req, res) {
     console.log("=== AUTH FUNCTION STARTED ===");
 
     const { code } = req.query;
+
     const CLIENT_ID = process.env.GITHUB_CLIENT_ID;
     const CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET;
 
@@ -13,60 +14,72 @@ export default async function handler(req, res) {
 
     const REDIRECT_URI = "https://decap-oauth-21vi.vercel.app/api/auth";
 
-    // If no code → redirect user to GitHub OAuth
+    // STEP 1: Redirect user to GitHub OAuth (first visit, no code yet)
     if (!code) {
       const params = new URLSearchParams({
         client_id: CLIENT_ID,
         redirect_uri: REDIRECT_URI,
-        scope: "repo"
+        scope: "repo",
       });
+
       return res.redirect(
         "https://github.com/login/oauth/authorize?" + params.toString()
       );
     }
 
-    // Exchange code for access token
+    // STEP 2: Exchange code for access token
     const tokenResponse = await fetch(
       "https://github.com/login/oauth/access_token",
       {
         method: "POST",
         headers: {
           Accept: "application/json",
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           client_id: CLIENT_ID,
           client_secret: CLIENT_SECRET,
           code,
-          redirect_uri: REDIRECT_URI
-        })
+          redirect_uri: REDIRECT_URI,
+        }),
       }
     );
 
     const data = await tokenResponse.json();
     console.log("GitHub token response:", data);
 
-    if (data.error) {
+    if (data.error || !data.access_token) {
       return res.status(400).json(data);
     }
 
-    // Send the token back to Decap CMS admin panel
+    // STEP 3: Send token back to Decap CMS in REQUIRED format
+    const message =
+      "authorization:github:success:" +
+      JSON.stringify({
+        token: data.access_token,
+        provider: "github",
+      });
+
     res.setHeader("Content-Type", "text/html");
-    res.end(`
-      <script>
-        if (window.opener) {
-          window.opener.postMessage(${JSON.stringify(data)}, "*");
-        }
-        window.close();
-      </script>
-      <p>Authentication complete. You may close this window.</p>
-    `);
+    res.end(
+      "<!doctype html>" +
+        "<html><body>" +
+        "<script>" +
+        "  if (window.opener) {" +
+        "    window.opener.postMessage(" +
+        JSON.stringify(message) +
+        ', "*");' +
+        "  }" +
+        "  window.close();" +
+        "</script>" +
+        "<p>Authentication complete. You may close this window.</p>" +
+        "</body></html>"
+    );
   } catch (err) {
     console.error("FUNCTION CRASH:", err);
-    return res.status(500).json({
+    res.status(500).json({
       error: "Function failed",
       message: err.message,
-      stack: err.stack
     });
   }
 }
